@@ -38,7 +38,7 @@ def clean_text(text: str) -> str:
     return text[:match.start()] if match else text
 
 
-def chunk_text(text: str, max_chunk_length: int = 2500) -> list:
+def chunk_text(text: str, max_chunk_length: int = 1500) -> list:
     """
     Split text into smaller chunks for RAG
     :param text:
@@ -87,19 +87,15 @@ def retrieve_relevant_chunks(query: str, chunks: list, chunk_embeddings: np.ndar
     return [chunks[i] for i in top_indices]
 
 
-def rag_summarise(document_text: str, query: str) -> str:
+def rag_summarise(query: str, chunks, embeddings, embedder) -> str:
     """
     Given a document and a query, retrieve top relevant chunks and use them to prompt the LLM
-    :param document_text:
     :param query:
+    :param chunks:
+    :param embeddings
+    :param embedder:
     :return:
     """
-    cleaned_text = clean_text(document_text)
-    chunks = chunk_text(cleaned_text)
-    print(f"Document split into {len(chunks)} chunks.")
-
-    embedder = SentenceTransformer("all-MiniLM-L6-v2")
-    embeddings = embed_chunks(chunks, embedder)
     relevant_chunks = retrieve_relevant_chunks(query, chunks, embeddings, embedder, top_k=3)
     context = "\n".join(relevant_chunks)
 
@@ -109,7 +105,8 @@ def rag_summarise(document_text: str, query: str) -> str:
     return response.get("response", "").strip()
 
 
-def process_file(file_path: Path, output_folder: Path,
+def process_file(file_path: Path,
+                 embedder,
                  query_author: str,
                  query_research_obj: str,
                  query_concepts: str,
@@ -121,7 +118,7 @@ def process_file(file_path: Path, output_folder: Path,
     Process a file using RAG: read the file, summarise it,
     save the summary as a .txt file, and return (filename, summary).
     :param file_path:
-    :param output_folder:
+    :param embedder:
     :param query_author:
     :param query_research_obj:
     :param query_concepts:
@@ -138,20 +135,25 @@ def process_file(file_path: Path, output_folder: Path,
         return None
 
     try:
+        cleaned_text = clean_text(text)
+        chunks = chunk_text(cleaned_text)
+        print(f"Document split into {len(chunks)} chunks.")
+        embeddings = embed_chunks(chunks, embedder)
+
         print(f"Searching for the Author of {file_path.name}")
-        author = rag_summarise(text, query_author)
+        author = rag_summarise(query_author, chunks, embeddings, embedder)
         print(f"Searching for the Research Objective of {file_path.name}")
-        research_obj = rag_summarise(text, query_research_obj)
+        research_obj = rag_summarise(query_research_obj, chunks, embeddings, embedder)
         print(f"Searching for the Key Concepts of {file_path.name}")
-        concepts = rag_summarise(text, query_concepts)
+        concepts = rag_summarise(query_concepts, chunks, embeddings, embedder)
         print(f"Searching for the Key Findings of {file_path.name}")
-        key_findings = rag_summarise(text, query_key_findings)
+        key_findings = rag_summarise(query_key_findings, chunks, embeddings, embedder)
         print(f"Searching for the Limitations of {file_path.name}")
-        limitations = rag_summarise(text, query_limitations)
+        limitations = rag_summarise(query_limitations, chunks, embeddings, embedder)
         print(f"Finding out the Research Gaps of {file_path.name}")
-        gap = rag_summarise(text, query_gap)
+        gap = rag_summarise(query_gap, chunks, embeddings, embedder)
         print(f"Searching for the Industry Relevance of {file_path.name}")
-        relevance = rag_summarise(text, query_relevance)
+        relevance = rag_summarise(query_relevance, chunks, embeddings, embedder)
         return author, research_obj, concepts, key_findings, limitations, gap, relevance
     except Exception as e:
         print(f"Error summarising {file_path.name}: {e}")
@@ -162,6 +164,8 @@ def main():
     input_folder = Path("input")
     output_folder = Path("output_rag")
     output_folder.mkdir(exist_ok=True)
+
+    embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
     query_author = "Give the output as just the author and the year. nothing else. First author's fullname + publication year.No citations.No markdown notes.No commentary.No references section.Answer must be less than 30 words.Return Plain text."
     query_research_obj = "Give the output as just the research objective of the research paper. nothing else.No citations.No markdown notes.No commentary.No references section.Answer must be less than 30 words.Return Plain text."
@@ -180,7 +184,7 @@ def main():
     for file in files:
         print(f"\nProcessing file {file.name} with RAG")
         result = process_file(file,
-                              output_folder,
+                              embedder,
                               query_author,
                               query_research_obj,
                               query_concepts,
