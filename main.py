@@ -114,7 +114,9 @@ def process_file(file_path: Path, output_folder: Path,
                  query_research_obj: str,
                  query_concepts: str,
                  query_key_findings: str,
-                 query_limitations: str) -> tuple[str,str,str,str,str] or None:
+                 query_limitations: str,
+                 query_gap: str,
+                 query_relevance: str) -> tuple[str,str,str,str,str,str,str] or None:
     """
     Process a file using RAG: read the file, summarise it,
     save the summary as a .txt file, and return (filename, summary).
@@ -124,7 +126,9 @@ def process_file(file_path: Path, output_folder: Path,
     :param query_research_obj:
     :param query_concepts:
     :param query_key_findings:
-    :param query_limitations
+    :param query_limitations:
+    :param query_gap:
+    :param query_relevance:
     :return:
     """
     try:
@@ -144,7 +148,11 @@ def process_file(file_path: Path, output_folder: Path,
         key_findings = rag_summarise(text, query_key_findings)
         print(f"Searching for the Limitations of {file_path.name}")
         limitations = rag_summarise(text, query_limitations)
-        return author, research_obj, concepts, key_findings, limitations
+        print(f"Finding out the Research Gaps of {file_path.name}")
+        gap = rag_summarise(text, query_gap)
+        print(f"Searching for the Industry Relevance of {file_path.name}")
+        relevance = rag_summarise(text, query_relevance)
+        return author, research_obj, concepts, key_findings, limitations, gap, relevance
     except Exception as e:
         print(f"Error summarising {file_path.name}: {e}")
         return None
@@ -160,6 +168,8 @@ def main():
     query_concepts = "Give the output just as Main Materials / Concepts that is Key materials, methods, technologies, or concepts only.No citations.No markdown notes.No commentary.No references section.Answer must be less than 30 words.Return Plain text."
     query_key_findings = "Give the output as just Key Findings that is the Most important result(s) only. nothing else.No citations.No markdown notes.No commentary.No references section.Report findings as direct factual statements.Write findings in an impersonal factual style.Focus only on results and conclusions.Answer must be less than 50 words.Do NOT mention author names, publication years, Study names, Citations.State only the result, conclusion or observation in the form of factual statement.Return Plain text."
     query_limitations = "Give the output as just the Limitations that is the Main limitation of the research paper. nothing else.No citations.No markdown notes.No commentary.No references section.Answer must be less than 40 words.Return Plain text."
+    query_gap = "Give the output as just the Research Gap that is, the Unexplored aspect or unresolved issue of the research paper.No citations.No markdown notes.No commentary.No references section.Answer must be less than 30 words.Output only the extracted text itself.Do not prepend field names, labels, headers, or category names.Return Plain text."
+    query_relevance = "Give the output as just the Industry Relevance that is, the Practical application or industrial significance. nothing else.No citations.No markdown notes.No commentary.No references section.Answer must be less than 30 words.Return Plain text."
     files = list(input_folder.glob("*.txt")) + list(input_folder.glob("*.pdf")) + list(input_folder.glob("*.PDF"))
 
     if not files:
@@ -175,7 +185,9 @@ def main():
                               query_research_obj,
                               query_concepts,
                               query_key_findings,
-                              query_limitations)
+                              query_limitations,
+                              query_gap,
+                              query_relevance)
         if result:
             results.append(result)
 
@@ -184,7 +196,9 @@ def main():
                                             "Research Objective",
                                             "Main Materials & Concepts",
                                             "Key Findings",
-                                            "Limitations"])
+                                            "Limitations",
+                                            "Research Gap",
+                                            "Industry Relevance"])
         excel_path = output_folder / "summaries.xlsx"
         df.index = range(1, len(df)+1)
         df.to_excel(excel_path, index=True)
