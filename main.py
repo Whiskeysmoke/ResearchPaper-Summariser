@@ -109,13 +109,22 @@ def rag_summarise(document_text: str, query: str) -> str:
     return response.get("response", "").strip()
 
 
-def process_file(file_path: Path, output_folder: Path, query: str) -> tuple[str,str] or None:
+def process_file(file_path: Path, output_folder: Path,
+                 query_author: str,
+                 query_research_obj: str,
+                 query_concepts: str,
+                 query_key_findings: str,
+                 query_limitations: str) -> tuple[str,str,str,str,str] or None:
     """
     Process a file using RAG: read the file, summarise it,
     save the summary as a .txt file, and return (filename, summary).
     :param file_path:
     :param output_folder:
-    :param query:
+    :param query_author:
+    :param query_research_obj:
+    :param query_concepts:
+    :param query_key_findings:
+    :param query_limitations
     :return:
     """
     try:
@@ -125,11 +134,17 @@ def process_file(file_path: Path, output_folder: Path, query: str) -> tuple[str,
         return None
 
     try:
-        answer = rag_summarise(text, query)
-        output_file = output_folder / f"{file_path.stem}_rag_answer.txt"
-        output_file.write_text(answer, encoding="utf-8")
-        print(f"RAG answer for {file_path.name} saved to {output_file}")
-        return file_path.name, answer
+        print(f"Searching for the Author of {file_path.name}")
+        author = rag_summarise(text, query_author)
+        print(f"Searching for the Research Objective of {file_path.name}")
+        research_obj = rag_summarise(text, query_research_obj)
+        print(f"Searching for the Key Concepts of {file_path.name}")
+        concepts = rag_summarise(text, query_concepts)
+        print(f"Searching for the Key Findings of {file_path.name}")
+        key_findings = rag_summarise(text, query_key_findings)
+        print(f"Searching for the Limitations of {file_path.name}")
+        limitations = rag_summarise(text, query_limitations)
+        return author, research_obj, concepts, key_findings, limitations
     except Exception as e:
         print(f"Error summarising {file_path.name}: {e}")
         return None
@@ -140,7 +155,11 @@ def main():
     output_folder = Path("output_rag")
     output_folder.mkdir(exist_ok=True)
 
-    query = " Summarise the key points of this document or the main argument"
+    query_author = "Give the output as just the author and the year. nothing else. First author's fullname + publication year.No citations.No markdown notes.No commentary.No references section.Answer must be less than 30 words.Return Plain text."
+    query_research_obj = "Give the output as just the research objective of the research paper. nothing else.No citations.No markdown notes.No commentary.No references section.Answer must be less than 30 words.Return Plain text."
+    query_concepts = "Give the output just as Main Materials / Concepts that is Key materials, methods, technologies, or concepts only.No citations.No markdown notes.No commentary.No references section.Answer must be less than 30 words.Return Plain text."
+    query_key_findings = "Give the output as just Key Findings that is the Most important result(s) only. nothing else.No citations.No markdown notes.No commentary.No references section.Report findings as direct factual statements.Write findings in an impersonal factual style.Focus only on results and conclusions.Answer must be less than 50 words.Do NOT mention author names, publication years, Study names, Citations.State only the result, conclusion or observation in the form of factual statement.Return Plain text."
+    query_limitations = "Give the output as just the Limitations that is the Main limitation of the research paper. nothing else.No citations.No markdown notes.No commentary.No references section.Answer must be less than 40 words.Return Plain text."
     files = list(input_folder.glob("*.txt")) + list(input_folder.glob("*.pdf")) + list(input_folder.glob("*.PDF"))
 
     if not files:
@@ -150,14 +169,25 @@ def main():
     results = []
     for file in files:
         print(f"\nProcessing file {file.name} with RAG")
-        result = process_file(file, output_folder, query)
+        result = process_file(file,
+                              output_folder,
+                              query_author,
+                              query_research_obj,
+                              query_concepts,
+                              query_key_findings,
+                              query_limitations)
         if result:
             results.append(result)
 
     if results:
-        df = pd.DataFrame(results, columns=["Filename", "Summary"])
+        df = pd.DataFrame(results, columns=["Author & Year",
+                                            "Research Objective",
+                                            "Main Materials & Concepts",
+                                            "Key Findings",
+                                            "Limitations"])
         excel_path = output_folder / "summaries.xlsx"
-        df.to_excel(excel_path, index=False)
+        df.index = range(1, len(df)+1)
+        df.to_excel(excel_path, index=True)
         print(f"\nAll summaries saved to {excel_path}")
 
 
